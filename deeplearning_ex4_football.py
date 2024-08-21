@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 from torch.utils.data import DataLoader
+import cv2  
+import matplotlib.pyplot as plt
 import json
 
 """
@@ -34,28 +36,62 @@ import json
 """
 
 class FootballDataset(Dataset):
-    def __init__(self, frame_collection, root_dir, transform=None):
-        self.frame_collection = frame_collection
-        self.root_dir = root_dir
+    def __init__(self, frame_collections, video_paths, transform=None):
+        self.frame_collections = frame_collections
+        # self.root_dir = root_dir
+        self.video_paths = video_paths
         self.transform = transform
-        self.frames = frame_collection['images']  # Assuming 'frames' is a key in the JSON that holds frame data
-        self.annotations = frame_collection['annotations'] # Elements of annotations are the detail of each frames
+        
+        self.frames = []
+        self.annotations = []
+        self.frame_map = {}  # Map from global idx to (video_index, frame_number)
+        
+        # Load frames and annotations from each video
+        global_idx = 0
+        for video_index, frame_collection in enumerate(frame_collections):
+            frames = frame_collection['images']
+            annotations = frame_collection['annotations']
+            for _, frame in enumerate(frames):
+                frame_number = frame['id']  # Frame number within the video
+                self.frame_map[global_idx] = (video_index, frame_number)
+                self.frames.append(frame)
+                self.annotations.append(annotations)
+                global_idx += 1
 
     def __len__(self):
         return len(self.frames)
 
     def __getitem__(self, idx):
+        
+        # Get the video index and frame number corresponding to idx
+        video_index, frame_number = self.frame_map[idx]
+        print (f"HERE IS MY POCCESS {video_index} :::::::, {frame_number}")
+
+        # Load the video file using OpenCV
+        video_path = self.video_paths[video_index]
+        cap = cv2.VideoCapture(video_path)
+
+        # Set the frame position and read the frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        ret, frame = cap.read()
+
+        if not ret:
+            raise ValueError(f"Could not read frame {frame_number} from video {video_path}")
+
+        # Convert the frame (which is in BGR) to RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(frame_rgb)
+
         # Get the frame info at the specified index and details data
         frame_info = self.frames[idx]
         frame_id = frame_info['id']
-        print ("test----------------------------------------------")
-        annotations_info = self.annotations
+        annotations_info = self.annotations[video_index]
         jersey_numbers = []
 
         # Load the image
-        img_name = os.path.join(self.root_dir, frame_info['file_name'])
-        print (img_name)
-        image = Image.open(img_name).convert('RGB')
+        # img_name = os.path.join(self.root_dir, frame_info['file_name'])
+        # # print (img_name)
+        # image = Image.open(img_name).convert('RGB')
 
         # Extract bounding boxes for the specified category_id and image_id
         bboxes = [
@@ -90,28 +126,45 @@ class FootballDataset(Dataset):
     
 # Define any data transformations
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((1200, 3840)),
     transforms.ToTensor(),
 ])
 
-with open('Match_1951_1_0_subclip.json', 'r') as f:
-    frame_collection = json.load(f)
+# Load multiple JSON files
+frame_collections = []
+json_files = ['Match_1951_1_0_subclip.json', 'Match_1951_1_1_subclip.json']  # Add more JSON files here
+
+for json_file in json_files:
+    with open(json_file, 'r') as f:
+        frame_collections.append(json.load(f))
+
+# List your video paths here
+video_paths = ["Match_1951_1_0_subclip.mp4", "Match_1951_1_1_subclip.mp4"]
 
 # Initialize the dataset
-dataset = FootballDataset(frame_collection=frame_collection, root_dir='./extracted_frames', transform=transform)
+dataset = FootballDataset(frame_collections=frame_collections, video_paths=video_paths, transform=transform)
 
 print(len(dataset))
 sample = dataset[0]
 
-# Print the filtered bounding boxes
-for i, bbox in enumerate(sample['bboxes'], 1):
-  print(f"Bounding box {i}: {bbox}")
+# # Print the filtered bounding boxes
+# for i, bbox in enumerate(sample['bboxes'], 1):
+#   print(f"Bounding box {i}: {bbox}")
 
-# Print the jersey_number bounding boxes
-for i, jnum in enumerate(sample['jersey_numbers'], 1):
-  print(f"jersey_number player {i}: is {jnum}")
+# # Print the jersey_number bounding boxes
+# for i, jnum in enumerate(sample['jersey_numbers'], 1):
+#   print(f"jersey_number player {i}: is {jnum}")
 
-# Example usage:
-# for data in dataset:
-    # print(data['image'].shape, data['boxes'], data['labels'])
+# To display the frame
+frame = sample['image']
+
+# Convert the tensor back to a PIL image for display
+frame_pil = transforms.ToPILImage()(frame)
+frame_pil.show()
+
+
+# Display using matplotlib
+# plt.imshow(frame_pil)
+# plt.axis('off')  # Turn off axis
+# plt.show()
 
