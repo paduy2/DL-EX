@@ -80,7 +80,8 @@ class FootballDataset(Dataset):
 
         # Convert the frame (which is in BGR) to RGB
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(frame_rgb)
+        image = frame_rgb
+        # image = Image.fromarray(frame_rgb)
 
         # Get the frame info at the specified index and details data
         frame_info = self.frames[idx]
@@ -126,8 +127,8 @@ class FootballDataset(Dataset):
     
 # Define any data transformations
 transform = transforms.Compose([
-    transforms.Resize((1200, 3840)),
     transforms.ToTensor(),
+    transforms.Resize((1200, 3840)),
 ])
 
 # Load multiple JSON files
