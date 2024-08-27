@@ -1,7 +1,6 @@
 import os
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 from torchvision.transforms import Compose, ToTensor, Resize, ToPILImage, transforms
 from PIL import Image
 from torch.utils.data import DataLoader
@@ -84,6 +83,12 @@ class FootballDataset(Dataset):
             for annotation in annotations_info
             if annotation['category_id'] == 4 and annotation['image_id'] == frame_id]
         
+        if len(bbox) > 0:
+            bbox = torch.tensor(bbox, dtype=torch.float32)
+        else:
+            bbox = torch.zeros((0, 4), dtype=torch.float32)  # In case no bbox is found
+
+
         # Extract number of player
         # for annotation in annotations_info:
         #   if "attributes" in annotation and "jersey_number" in annotation["attributes"] and annotation['category_id'] == 4 and annotation['image_id'] == frame_id :
@@ -129,7 +134,9 @@ if __name__ == "__main__":
 
     image, bbox, jersey_number = train_dataset[0]
     frame = image
-    print (image.shape)
+    # print (image.shape )
+    # print (bbox)
+    # print (jersey_number)
 
     # # Convert the tensor back to a PIL image for display
     # frame_pil = transforms.ToPILImage()(frame)
